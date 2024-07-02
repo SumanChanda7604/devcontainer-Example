@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./backend:/workspace/backend
+      - ./frontend:/workspace/frontend
+    ports:
+      - "8082:8082"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    volumes:
+      - ./frontend:/workspace/frontend
+      - ./backend:/workspace/backend
+    ports:
+      - "8083:8083"
+    depends_on:
+      - backend
+
+  db:
+    build:
+      context: ./db
+    volumes:
+      - ./db:/workspace/db
+    ports:
+      - "1433:1433"
+    environment:
+      - SA_PASSWORD=P@ssw0rd
+      - ACCEPT_EULA=Y
+      - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
+    # Add this line to ensure the init.sql file is used for initialization
+    command: [ "sqlservr", "-S", "localhost", "-d", "SampleDB", "-U", "sa", "-P", "P@ssw0rd" ]
+    entrypoint: [ "sh", "-c", "sleep 10; /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd -d master -i /workspace/db/init-db.sql; /opt/mssql/bin/sqlservr" ]

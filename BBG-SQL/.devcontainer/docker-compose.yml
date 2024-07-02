@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+    volumes:
+      - ../backend:/workspace/backend
+      - ../frontend:/workspace/frontend
+    ports:
+      - "8082:8082"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ../frontend
+    volumes:
+      - ../frontend:/workspace/frontend
+      - ../backend:/workspace/backend
+    ports:
+      - "8083:8083"
+    depends_on:
+      - backend
+
+  db:
+    build:
+      context: ../db
+    volumes:
+      - ../db:/workspace/db
+    ports:
+      - "1433:1433"

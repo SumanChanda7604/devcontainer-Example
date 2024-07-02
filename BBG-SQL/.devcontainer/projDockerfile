@@ -1,0 +1,71 @@
+# Base image for the build environment
+FROM ubuntu:20.04 as build
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    apt-transport-https \
+    gnupg \
+    lsb-release \
+    sudo \
+    gcc \
+    g++ \
+    unixodbc-dev \
+    libicu-dev \
+    coreutils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Microsoft's GPG key and repository for SQL Server
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | tee /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update && ACCEPT_EULA=Y apt-get install -y mssql-tools \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Create the `vscode` user and add to the sudo group
+RUN useradd -ms /bin/bash -u 1000 vscode && \
+    echo "vscode:password" | chpasswd && \
+    usermod -aG sudo vscode && \
+    mkdir -p /workspace && chown vscode:vscode /workspace
+
+# Create a working directory
+WORKDIR /workspace
+
+# Copy common files
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Define the backend build stage
+FROM build as backend
+
+# Set the working directory for backend
+WORKDIR /workspace/backend
+
+# Copy backend files
+COPY backend/requirements.txt /workspace/backend/
+RUN pip install -r /workspace/backend/requirements.txt
+COPY backend /workspace/backend
+
+# Define the frontend build stage
+FROM build as frontend
+
+# Set the working directory for frontend
+WORKDIR /workspace/frontend
+
+# Copy frontend files
+COPY frontend/package.json frontend/package-lock.json /workspace/frontend/
+RUN cd /workspace/frontend && npm install
+COPY frontend /workspace/frontend
+
+# Set environment variable for .NET globalization
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
+# Expose ports for backend and frontend
+EXPOSE 8082 8083
+
+# Set the working directory for the backend
+WORKDIR /workspace/backend
+
+# Default command to run
+CMD ["/usr/local/bin/start.sh"]
